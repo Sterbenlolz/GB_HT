@@ -1,5 +1,5 @@
 import json
-import time
+from time import time
 from typing import NamedTuple
 
 from requests import get
@@ -11,9 +11,9 @@ PRICE_PATH = '/api/v3/ticker/price'
 
 def time_dec(func: callable) -> callable:
     def timer(*args, **kwargs):
-        start = time.time()
+        start = time()
         result = func(*args, **kwargs)
-        end = time.time()
+        end = time()
         print(f'Время выполнения функции {func.__name__} равно {end - start} секунд.')
         return result
 
@@ -34,18 +34,18 @@ class BinanceException(Exception):
 
 
 class BinanceTimePrice(NamedTuple):
-    time: float
+    responce_time: float
     price: float
 
 
 # Данная функция позволяет определить котировку XRP/USDT на текущий момент времени.
 # Среднее время выполнения функции составило 0,4 секунды.
 # Большую часть времени здесь занимает время обращения на сервер (0,36 с), то есть сам код выполняется за 40 мс.
-# @time_dec
+@time_dec
 def get_time_price(url: str, params: dict) -> BinanceTimePrice:
     r = get(url, params=params)
     if r.status_code == 200:
-        return BinanceTimePrice(time.time() * 1000, float(json.loads(json.dumps(r.json(), indent=2))['price']))
+        return BinanceTimePrice(time() * 1000, float(json.loads(json.dumps(r.json(), indent=2))['price']))
     else:
         raise BinanceException(status_code=r.status_code, data=r.json())
 
@@ -62,7 +62,7 @@ def main(currency1: str, currency2: str):
     while True:
         time_price = get_time_price(url, params)
         prices_keys = prices.keys()
-        prices[time_price.time] = time_price.price
+        prices[time_price.responce_time] = time_price.price
         if time_price.price <= max(prices.values()) * 0.99:
             print(f'{currency1}/{currency2} price dropped 1% compared to the max!')
         if max(prices_keys) - min(prices_keys) > SCANNING_TIME * 1000:
