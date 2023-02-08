@@ -9,7 +9,7 @@ BASE_URL = 'https://api.binance.com'
 PRICE_PATH = '/api/v3/ticker/price'
 
 
-def time_dec(func):
+def time_dec(func: callable) -> callable:
     def timer(*args, **kwargs):
         start = time.time()
         result = func(*args, **kwargs)
@@ -33,7 +33,7 @@ class BinanceException(Exception):
         super().__init__(message)
 
 
-class BinanceTimestamp(NamedTuple):
+class BinanceTimePrice(NamedTuple):
     time: float
     price: float
 
@@ -42,10 +42,10 @@ class BinanceTimestamp(NamedTuple):
 # Среднее время выполнения функции составило 0,4 секунды.
 # Большую часть времени здесь занимает время обращения на сервер (0,36 с), то есть сам код выполняется за 40 мс.
 # @time_dec
-def get_price(url, params) -> BinanceTimestamp:
+def get_time_price(url: str, params: dict) -> BinanceTimePrice:
     r = get(url, params=params)
     if r.status_code == 200:
-        return BinanceTimestamp(time.time() * 1000, float(json.loads(json.dumps(r.json(), indent=2))['price']))
+        return BinanceTimePrice(time.time() * 1000, float(json.loads(json.dumps(r.json(), indent=2))['price']))
     else:
         raise BinanceException(status_code=r.status_code, data=r.json())
 
@@ -53,21 +53,21 @@ def get_price(url, params) -> BinanceTimestamp:
 # Основная функция, заполняющая словарь prices парами "время": "цена" и проверяющая падение цены.
 # Так же эта функция удаляет старые значения цены из словаря prices, чтобы содержались котировки
 # только за последний час (либо любое другое время, указанное в секундах в переменной SCANNING_TIME).
-def main(currency1, currency2):
+def main(currency1: str, currency2: str):
     prices = {}
     currency1 = currency1.upper()
     currency2 = currency2.upper()
     params = {'symbol': f'{currency1}{currency2}'}
     url = f'{BASE_URL}{PRICE_PATH}'
     while True:
-        price_item = get_price(url, params)
+        time_price = get_time_price(url, params)
         prices_keys = prices.keys()
-        prices[price_item.time] = price_item.price
-        if price_item.price <= max(prices.values()) * 0.99:
+        prices[time_price.time] = time_price.price
+        if time_price.price <= max(prices.values()) * 0.99:
             print(f'{currency1}/{currency2} price dropped 1% compared to the max!')
         if max(prices_keys) - min(prices_keys) > SCANNING_TIME * 1000:
             prices.pop(min(prices_keys))
-            print('deleted oldest price')
+            # print('deleted oldest price')
 
 
 if __name__ == '__main__':
