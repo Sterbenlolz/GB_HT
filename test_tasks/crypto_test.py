@@ -4,12 +4,13 @@ from typing import NamedTuple
 
 from requests import get
 
-SCANNING_TIME = 3600  # 1 час в секундах
+SCANNING_TIME = 3600
 BASE_URL = 'https://api.binance.com'
 PRICE_PATH = '/api/v3/ticker/price'
 
 
 def time_dec(func):
+    """A time decorator to measure the execution time of any function in the script"""
     def timer(*args, **kwargs):
         start = time()
         result = func(*args, **kwargs)
@@ -21,6 +22,7 @@ def time_dec(func):
 
 
 class BinanceException(Exception):
+    """Exception class"""
     def __init__(self, status_code, data):
         self.status_code = status_code
         if data:
@@ -34,26 +36,23 @@ class BinanceException(Exception):
 
 
 class BinanceTimePrice(NamedTuple):
+    """A class with NamedTuple link for get_time_price function"""
     responce_time: float
     price: float
 
 
-# Данная функция позволяет определить котировку XRP/USDT на текущий момент времени.
-# Среднее время выполнения функции составило 0,4 секунды.
-# Большую часть времени здесь занимает время обращения на сервер (0,36 с), то есть сам код выполняется за 40 мс.
-@time_dec
-def get_time_price(url: str, params: dict[str,str]) -> BinanceTimePrice:
-    r = get(url, params=params)
-    if r.status_code == 200:
-        return BinanceTimePrice(time() * 1000, float(json.loads(json.dumps(r.json(), indent=2))['price']))
-    else:
-        raise BinanceException(status_code=r.status_code, data=r.json())
+# @time_dec
+def get_time_price(url: str, params: dict[str, str]) -> BinanceTimePrice:
+    """Function that is used to fill prices dict in main func with time:price items"""
+    responce = get(url, params=params, timeout=10)
+    if responce.status_code == 200:
+        return BinanceTimePrice(time() * 1000,
+                                float(json.loads(json.dumps(responce.json(), indent=2))['price']))
+    raise BinanceException(status_code=responce.status_code, data=responce.json())
 
 
-# Основная функция, заполняющая словарь prices парами "время": "цена" и проверяющая падение цены.
-# Так же эта функция удаляет старые значения цены из словаря prices, чтобы содержались котировки
-# только за последний час (либо любое другое время, указанное в секундах в переменной SCANNING_TIME).
 def main(currency1: str, currency2: str) -> None:
+    """Main function for scanning prices on Binance market"""
     prices = {}
     currency1 = currency1.upper()
     currency2 = currency2.upper()
